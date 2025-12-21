@@ -1,0 +1,16 @@
+# Derleme dosyaları (Çöp)
+cmake-build-debug/
+cmake-build-release/
+build/
+bin/
+lib/
+
+# CLion ayar dosyaları (Kişisel ayarlar)
+.idea/
+
+# Windows exe dosyaları
+*.exe
+*.dll
+*.obj
+*.pdb
+*.ilk
