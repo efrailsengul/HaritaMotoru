@@ -54,7 +54,15 @@ set(IMGUI_SFML_FIND_SFML OFF CACHE BOOL "Disable internal find_package" FORCE)
 FetchContent_MakeAvailable(imgui-sfml)
 
 # --- PROJE ---
-add_executable(HaritaMotoru main.cpp)
+add_executable(HaritaMotoru main.cpp
+        Node.hpp
+        GUI.cpp
+        MapGenerator.cpp
+        Algorithims.cpp
+        MapGenerator.hpp
+        Algorithims.hpp
+        Settings.hpp
+)
 
 target_link_libraries(HaritaMotoru
         PRIVATE

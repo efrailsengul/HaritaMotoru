@@ -1,49 +1,76 @@
 #include <SFML/Graphics.hpp>
 #include <imgui.h>
 #include <imgui-sfml.h>
+#include "Algorithims.hpp"
+#include "Node.hpp"
+#include "MapGenerator.hpp"
+#include "Settings.hpp"
+using namespace sf;
+const float CELL_SIZE = 15.0f;
 
+// Renklendirme ve Çizim Fonksiyonu
+void drawDebugGrid(RenderWindow& window, Node map[ROW][COLUMN]) {
+    RectangleShape cell(Vector2f(CELL_SIZE - 1.0f, CELL_SIZE - 1.0f));
+
+    for (int i = 0; i < ROW; i++) {
+        for (int j = 0; j < COLUMN; j++) {
+            cell.setPosition(j * CELL_SIZE, i * CELL_SIZE);
+
+            if (map[i][j].isStart) {
+                cell.setFillColor(Color::Green);
+            }
+            else if (map[i][j].isFinish) {
+                cell.setFillColor(Color::Red);
+            }
+            else if (map[i][j].isWall) {
+                cell.setFillColor(Color::Black);
+            }
+            else if (map[i][j].isPath)
+                cell.setFillColor(Color::Yellow);
+            else if (map[i][j].isVisited) {
+                cell.setFillColor(Color(100, 100, 255));
+            }
+
+            else {
+                cell.setFillColor(Color(240, 240, 240));
+            }
+
+            window.draw(cell);
+        }
+    }
+}
 int main() {
-    // SFML 2.6 Pencere
-    sf::RenderWindow window(sf::VideoMode(1280, 720), "Harita Motoru (Stabil)");
+    Node map[ROW][COLUMN];
+    initMap(map);
+    generate_w_kruskal(map);
+    // dijkstra(map,&map[0][0],&map[ROW-1][COLUMN-1]);
+    A_star(map,&map[0][0],&map[ROW-1][COLUMN-1]);
+    RenderWindow window(VideoMode(COLUMN * CELL_SIZE, ROW * CELL_SIZE), "Algoritma Test Penceresi");
     window.setFramerateLimit(60);
 
-    // ImGui Başlat
-    if (!ImGui::SFML::Init(window)) return -1;
-
-    // NOT: Docking flag'ini sildik çünkü standart sürüm kullanıyoruz.
-    // Artık pencereler sadece ana pencere içinde hareket eder.
-
-    sf::Clock deltaClock;
-
-    // Arka plan rengi
-    float bgColor[3] = { 0.1f, 0.1f, 0.1f };
-
     while (window.isOpen()) {
-        sf::Event event;
+        Event event; // sf::Event -> Event
         while (window.pollEvent(event)) {
-            ImGui::SFML::ProcessEvent(window, event);
-            if (event.type == sf::Event::Closed) window.close();
+            if (event.type == Event::Closed) // sf::Event::Closed -> Event::Closed
+                window.close();
+
+            if (Mouse::isButtonPressed(Mouse::Left)) {
+                Vector2i mousePos = Mouse::getPosition(window);
+                int j = mousePos.x / CELL_SIZE;
+                int i = mousePos.y / CELL_SIZE;
+
+                if (i >= 0 && i < ROW && j >= 0 && j < COLUMN) {
+                    if (!map[i][j].isStart && !map[i][j].isFinish) {
+                        map[i][j].isWall = true;
+                    }
+                }
+            }
         }
 
-        ImGui::SFML::Update(window, deltaClock.restart());
-
-        // --- Arayüz ---
-        ImGui::Begin("Kontrol Paneli");
-        ImGui::Text("Stabilite > Macera :)");
-        ImGui::ColorEdit3("Arka Plan", bgColor);
-        ImGui::End();
-        // -------------
-
-        window.clear(sf::Color(
-            (int)(bgColor[0] * 255),
-            (int)(bgColor[1] * 255),
-            (int)(bgColor[2] * 255)
-        ));
-
-        ImGui::SFML::Render(window);
+        window.clear(Color::White); // Arkaplan beyaz
+        drawDebugGrid(window, map);
         window.display();
     }
 
-    ImGui::SFML::Shutdown();
     return 0;
 }
