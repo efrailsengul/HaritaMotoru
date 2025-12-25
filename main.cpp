@@ -1,6 +1,8 @@
 #include <SFML/Graphics.hpp>
 #include <imgui.h>
 #include <imgui-sfml.h>
+#include <iostream>
+
 #include "Algorithims.hpp"
 #include "Node.hpp"
 #include "MapGenerator.hpp"
@@ -26,7 +28,7 @@ void drawDebugGrid(RenderWindow& window, Node map[ROW][COLUMN]) {
                 cell.setFillColor(Color::Black);
             }
             else if (map[i][j].isPath)
-                cell.setFillColor(Color::Yellow);
+                cell.setFillColor(Color::Magenta);
             else if (map[i][j].isVisited) {
                 cell.setFillColor(Color(100, 100, 255));
             }
@@ -43,8 +45,8 @@ int main() {
     Node map[ROW][COLUMN];
     initMap(map);
     generate_w_kruskal(map);
-    // dijkstra(map,&map[0][0],&map[ROW-1][COLUMN-1]);
-    A_star(map,&map[0][0],&map[ROW-1][COLUMN-1]);
+     // dijkstra(map,&map[0][0],&map[ROW-1][COLUMN-1]);
+    // A_star(map,&map[0][0],&map[ROW-1][COLUMN-1]);
     RenderWindow window(VideoMode(COLUMN * CELL_SIZE, ROW * CELL_SIZE), "Algoritma Test Penceresi");
     window.setFramerateLimit(60);
 
@@ -53,7 +55,16 @@ int main() {
         while (window.pollEvent(event)) {
             if (event.type == Event::Closed) // sf::Event::Closed -> Event::Closed
                 window.close();
+            if (event.type == sf::Event::KeyPressed) {
+                // Hangi tuş? -> SPACE
+                if (event.key.code == sf::Keyboard::Space) {
+                    std::cout << "Space algilandi, algoritma basliyor..." << std::endl; // Konsoldan teyit et
 
+                    // Başlangıç ve bitiş noktalarını burada bulup gönder
+                    // Örnek: Start ve End node'larını bulup fonksiyona ver
+                    dijkstra(window, map, &map[0][0], &map[ROW-1][COLUMN-1]);
+                }
+            }
             if (Mouse::isButtonPressed(Mouse::Left)) {
                 Vector2i mousePos = Mouse::getPosition(window);
                 int j = mousePos.x / CELL_SIZE;

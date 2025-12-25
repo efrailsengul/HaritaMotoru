@@ -6,6 +6,8 @@
 #include <queue>
 #include "Algorithims.hpp"
 #include "Settings.hpp"
+#include <SFML/Graphics.hpp>
+
 using namespace std;
 
 // önceliği düşük değere göre ayarlamak için yazılan fonksiyon
@@ -39,7 +41,7 @@ void backtrack(Node* finish) {
         }
     }
 }
-void dijkstra(Node map[ROW][COLUMN], Node *start, Node *finish) {
+void dijkstra(sf::RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
     priority_queue<Node*, vector<Node*>, CompareDist> pq;
     start->isVisited=true;
     start->parent=nullptr;
@@ -51,6 +53,22 @@ void dijkstra(Node map[ROW][COLUMN], Node *start, Node *finish) {
         if (current==finish) {
             backtrack(finish);
             return;
+        }
+        // 2. Ekranı temizle ve haritayı o anki haliyle çiz
+        window.clear(sf::Color::White);
+        drawDebugGrid(window, map); // Senin harita çizme fonksiyonun
+        window.display();
+
+        // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
+        sf::sleep(sf::milliseconds(25));
+
+        // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window.close();
+                return;
+            }
         }
         for (int i=0;i<4;i++) {
             int nx= current->x+dr[i];
