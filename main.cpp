@@ -62,7 +62,7 @@ int main() {
 
                     // Başlangıç ve bitiş noktalarını burada bulup gönder
                     // Örnek: Start ve End node'larını bulup fonksiyona ver
-                    dijkstra(window, map, &map[0][0], &map[ROW-1][COLUMN-1]);
+                    DFS(window, map, &map[0][0], &map[ROW-1][COLUMN-1]);
                 }
             }
             if (Mouse::isButtonPressed(Mouse::Left)) {

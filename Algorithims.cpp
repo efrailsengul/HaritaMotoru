@@ -7,7 +7,7 @@
 #include "Algorithims.hpp"
 #include "Settings.hpp"
 #include <SFML/Graphics.hpp>
-
+using namespace sf;
 using namespace std;
 
 // önceliği düşük değere göre ayarlamak için yazılan fonksiyon
@@ -28,19 +28,42 @@ struct CompareForAStar{
 //komşuları gezme işleminin daha hızlı olması için
 int dr[]={-1,1,0,0};
 int dc[]={0,0,-1,1};
-void backtrack(Node* finish) {
+void backtrack(RenderWindow& window,Node* finish,Node map[ROW][COLUMN]) {
+    stack<Node*> path;
     Node* current = finish;
     int safetyCounter = 0;
     while (current != nullptr) {
-        current->isPath = true;
+        path.push(current);
         current = current->parent;
+
         safetyCounter++;
         if (safetyCounter > ROW * COLUMN) {
             cout << "HATA: Backtrack sonsuz donguye girdi veya start bulunamadi!" << endl;
             break;
         }
     }
-}
+        while (!path.empty()) {
+            Node* temp =path.top();
+            path.pop();
+            temp->isPath=true;
+
+            window.clear(sf::Color::White); // Arkaplanı temizle
+            drawDebugGrid(window, map);     // Haritayı güncel haliyle çiz
+            window.display();               // Ekrana bas
+
+            sf::sleep(sf::milliseconds(10)); // Hızı buradan ayarla (25-50 ideal)
+
+            // Pencerenin donmaması için Event Kontrolü (Çok önemli!)
+            sf::Event event;
+            while (window.pollEvent(event)) {
+                if (event.type == sf::Event::Closed) {
+                    window.close();
+                    return;
+                }
+            }
+        }
+    }
+
 void dijkstra(sf::RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
     priority_queue<Node*, vector<Node*>, CompareDist> pq;
     start->isVisited=true;
@@ -51,7 +74,7 @@ void dijkstra(sf::RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node 
         Node* current=pq.top();
         pq.pop();
         if (current==finish) {
-            backtrack(finish);
+            backtrack(window,finish,map);
             return;
         }
         // 2. Ekranı temizle ve haritayı o anki haliyle çiz
@@ -60,7 +83,7 @@ void dijkstra(sf::RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node 
         window.display();
 
         // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
-        sf::sleep(sf::milliseconds(25));
+        sf::sleep(sf::milliseconds(10));
 
         // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
         sf::Event event;
@@ -89,7 +112,7 @@ void dijkstra(sf::RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node 
     }
 }
 
-void A_star(Node map[ROW][COLUMN], Node *start, Node *finish) {
+void A_star(RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
     priority_queue<Node*,vector<Node*>,CompareForAStar> pq;
     start->dist=0;
     start->isVisited=true;
@@ -103,8 +126,23 @@ void A_star(Node map[ROW][COLUMN], Node *start, Node *finish) {
         pq.pop();
 
         if (current==finish) {
-            backtrack(finish);
+            backtrack(window,finish,map);
             return;
+        }
+        window.clear(sf::Color::White);
+        drawDebugGrid(window, map); // Senin harita çizme fonksiyonun
+        window.display();
+
+        // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
+        sf::sleep(sf::milliseconds(10));
+
+        // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window.close();
+                return;
+            }
         }
         for (int i=0;i<4;i++) {
             int nx= current->x+dr[i];
@@ -127,11 +165,102 @@ void A_star(Node map[ROW][COLUMN], Node *start, Node *finish) {
         }
     }
 }
-void DFS(Node* map[ROW][COLUMN], Node *start, Node *finish) {
+void DFS(RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
+    stack<Node*> st;
+    start->isVisited=true;
+    start->dist=0;
+    st.push(start);
+
+    while (!st.empty()) {
+    Node* current = st.top();
+        st.pop();
+        if (current==finish) {
+            backtrack(window,finish,map);
+            return;
+        }
+        window.clear(sf::Color::White);
+        drawDebugGrid(window, map); // Senin harita çizme fonksiyonun
+        window.display();
+
+        // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
+        sf::sleep(sf::milliseconds(10));
+
+        // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window.close();
+                return;
+            }
+        }
+
+        for (int i=0;i<4;i++) {
+            int nx= current->x+dr[i];
+            int ny= current->y+dc[i];
+
+            if (nx>=0 && nx<ROW && ny>=0 && ny<COLUMN) {
+                Node* neighbour = &map[nx][ny];
+                if (!neighbour->isWall && !neighbour->isVisited) { // DFS olduğu için ziyaret edilmemesi ve duvar olmaması yeterli
+
+                    neighbour->isVisited=true;
+                    neighbour->parent=current;
+                    neighbour->dist=current->dist+1;
+
+                    st.push(neighbour);
+                }
+            }
+
+        }
+
+    }
 
 }
-void BFS(Node* map[ROW][COLUMN], Node *start, Node *finish) {
+void BFS(RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
+    queue<Node*> que;
+    start->isVisited = true;
+    start->dist = 0;
+    que.push(start);
 
+    while (!que.empty()) {
+        Node* current = que.front();
+        que.pop();
+
+        if (current==finish) {
+            backtrack(window,finish,map);
+            return;
+        }
+        window.clear(sf::Color::White);
+        drawDebugGrid(window, map); // Senin harita çizme fonksiyonun
+        window.display();
+
+        // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
+        sf::sleep(sf::milliseconds(10));
+
+        // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed) {
+                window.close();
+                return;
+            }
+        }
+        for (int i=0;i<4;i++) {
+            int nx=current->x+dr[i];
+            int ny=current->y+dc[i];
+
+            if (nx>=0 && nx<ROW && ny>=0 && ny<COLUMN) {
+                Node* neighbour= &map[nx][ny];
+
+                if (!neighbour->isWall && !neighbour->isVisited) { // BFS olduğu için duvar değilse ve ziyaret edilmemişse git
+                    neighbour->isVisited=true;
+                    neighbour->parent=current;
+                    neighbour->dist=current->dist+1;
+
+                    que.push(neighbour);
+                }
+            }
+        }
+    }
 }
 
 
