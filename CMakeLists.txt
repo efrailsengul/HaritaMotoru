@@ -62,6 +62,7 @@ add_executable(HaritaMotoru main.cpp
         MapGenerator.hpp
         Algorithims.hpp
         Settings.hpp
+        GUI.hpp
 )
 
 target_link_libraries(HaritaMotoru

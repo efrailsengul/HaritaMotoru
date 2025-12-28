@@ -1,163 +1,128 @@
-#include <iostream>
+#include "Algorithims.hpp"
+#include "GUI.hpp"      // Çizim fonksiyonu (drawUI) için
+#include "Settings.hpp"
 #include "Node.hpp"
+
+#include <iostream>
 #include <vector>
 #include <stack>
-#include <climits>
 #include <queue>
-#include "Algorithims.hpp"
-#include "Settings.hpp"
+#include <climits>
 #include <SFML/Graphics.hpp>
+#include <imgui.h>
+#include <imgui-sfml.h>
+
 using namespace sf;
 using namespace std;
 
-// önceliği düşük değere göre ayarlamak için yazılan fonksiyon
-struct CompareDist {
-    bool operator()(const Node* a, const Node* b) const {
-        return a->dist > b->dist;
-    }
-};
-struct CompareForAStar{
-    bool operator()(Node* a, Node* b) {
-        if (a->fcost==b->fcost) {
-            return a->heur > b->heur;
-        }
-        return a->fcost > b->fcost;  //A* olduğu için önceliği fcost a göre yapıyoruz
-    }
-};
+// Yönler (Yukarı, Aşağı, Sol, Sağ)
+int dr[] = {-1, 1, 0, 0};
+int dc[] = {0, 0, -1, 1};
 
-//komşuları gezme işleminin daha hızlı olması için
-int dr[]={-1,1,0,0};
-int dc[]={0,0,-1,1};
-void backtrack(RenderWindow& window,Node* finish,Node map[ROW][COLUMN]) {
+// Karşılaştırma Yapıları (Priority Queue için)
+struct CompareDist { bool operator()(const Node* a, const Node* b) const { return a->dist > b->dist; } };
+struct CompareForAStar{ bool operator()(Node* a, Node* b) { return (a->fcost == b->fcost) ? (a->heur > b->heur) : (a->fcost > b->fcost); } };
+
+// --- GÖRSELLEŞTİRME YARDIMCISI ---
+void renderFrame(RenderWindow& window, Node map[ROW][COLUMN], Node* start, Node* finish) {
+    static sf::Clock renderClock;
+    sf::Time dt = renderClock.restart();
+
+    // Delta time hatasını önlemek için güvenlik
+    if (dt.asSeconds() <= 0.0f) dt = sf::seconds(0.001f);
+
+    ImGui::SFML::Update(window, dt);
+
+    window.clear(sf::Color::White);
+    drawDebugGrid(window, map);
+
+    int dummyAlgo = 0;
+    // GUI'yi çiz ama butonları kilitle (true)
+    // Font parametresini sildik çünkü GUI.hpp'de globalFont kullanıyoruz.
+    drawUI(window, map, start, finish, dummyAlgo, true);
+
+    ImGui::SFML::Render(window);
+    window.display();
+}
+
+// --- GERİYE TAKİP (BACKTRACK) ---
+void backtrack(RenderWindow& window, Node* finish, Node map[ROW][COLUMN]) {
     stack<Node*> path;
     Node* current = finish;
-    int safetyCounter = 0;
-    while (current != nullptr) {
-        path.push(current);
-        current = current->parent;
+    Node* startNode = nullptr;
 
-        safetyCounter++;
-        if (safetyCounter > ROW * COLUMN) {
-            cout << "HATA: Backtrack sonsuz donguye girdi veya start bulunamadi!" << endl;
-            break;
-        }
+    // Start node'u bul (UI düzgün çizilsin diye)
+    for(int i=0; i<ROW; i++) for(int j=0; j<COLUMN; j++) if(map[i][j].isStart) startNode = &map[i][j];
+
+    // Yolu stack'e at
+    while (current != nullptr) { path.push(current); current = current->parent; }
+
+    // Animasyonlu çizim
+    while (!path.empty()) {
+        Node* temp = path.top(); path.pop();
+        temp->isPath = true;
+
+        renderFrame(window, map, startNode, finish);
+
+        sf::sleep(sf::milliseconds(20)); // Yolu çizerken biraz bekle
+
+        sf::Event event; while (window.pollEvent(event)) if (event.type == sf::Event::Closed) { window.close(); return; }
     }
-        while (!path.empty()) {
-            Node* temp =path.top();
-            path.pop();
-            temp->isPath=true;
+}
 
-            window.clear(sf::Color::White); // Arkaplanı temizle
-            drawDebugGrid(window, map);     // Haritayı güncel haliyle çiz
-            window.display();               // Ekrana bas
-
-            sf::sleep(sf::milliseconds(10)); // Hızı buradan ayarla (25-50 ideal)
-
-            // Pencerenin donmaması için Event Kontrolü (Çok önemli!)
-            sf::Event event;
-            while (window.pollEvent(event)) {
-                if (event.type == sf::Event::Closed) {
-                    window.close();
-                    return;
-                }
-            }
-        }
-    }
-
-void dijkstra(sf::RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
+// --- 1. DIJKSTRA ---
+void dijkstra(sf::RenderWindow& window, Node map[ROW][COLUMN], Node *start, Node *finish) {
     priority_queue<Node*, vector<Node*>, CompareDist> pq;
-    start->isVisited=true;
-    start->parent=nullptr;
-    start->dist=0;
-    pq.push(start);
-    while (!pq.empty()) {
-        Node* current=pq.top();
-        pq.pop();
-        if (current==finish) {
-            backtrack(window,finish,map);
-            return;
-        }
-        // 2. Ekranı temizle ve haritayı o anki haliyle çiz
-        window.clear(sf::Color::White);
-        drawDebugGrid(window, map); // Senin harita çizme fonksiyonun
-        window.display();
-
-        // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
-        sf::sleep(sf::milliseconds(10));
-
-        // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-                return;
-            }
-        }
-        for (int i=0;i<4;i++) {
-            int nx= current->x+dr[i];
-            int ny= current->y+dc[i];
-            if (nx>=0&&nx<ROW&& ny>=0&&ny<COLUMN) {
-                Node* neighbour= &map[nx][ny];
-                if (!neighbour->isWall) {
-                    int newdist= current->dist+1; //ağırlıksız yaptığımız için her kare 1
-                    if (newdist<neighbour->dist) {
-                        neighbour->dist=newdist;
-                        neighbour->parent=current;
-                        neighbour->isVisited=true;
-                        pq.push(neighbour);
-                    }
-                }
-            }
-        }
-    }
-}
-
-void A_star(RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
-    priority_queue<Node*,vector<Node*>,CompareForAStar> pq;
-    start->dist=0;
-    start->isVisited=true;
-    start->parent=nullptr;
-    start->fcost = start->dist + start->heur;
-
-    pq.push(start);
+    start->isVisited = true; start->dist = 0; pq.push(start);
 
     while (!pq.empty()) {
-        Node* current = pq.top();
-        pq.pop();
+        Node* current = pq.top(); pq.pop();
+        if (current == finish) { backtrack(window, finish, map); return; }
 
-        if (current==finish) {
-            backtrack(window,finish,map);
-            return;
-        }
-        window.clear(sf::Color::White);
-        drawDebugGrid(window, map); // Senin harita çizme fonksiyonun
-        window.display();
+        renderFrame(window, map, start, finish);
+        // sf::sleep(sf::milliseconds(1)); // İstersen hızlandır
 
-        // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
-        sf::sleep(sf::milliseconds(10));
+        sf::Event event; while (window.pollEvent(event)) if (event.type == sf::Event::Closed) { window.close(); return; }
 
-        // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-                return;
-            }
-        }
-        for (int i=0;i<4;i++) {
-            int nx= current->x+dr[i];
-            int ny= current->y+dc[i];
-            if (nx>=0 && nx<ROW && ny>=0 && ny<COLUMN) {
+        for (int i = 0; i < 4; i++) {
+            int nx = current->x + dr[i]; int ny = current->y + dc[i];
+            if (nx >= 0 && nx < ROW && ny >= 0 && ny < COLUMN) {
                 Node* neighbour = &map[nx][ny];
+                if (!neighbour->isWall && current->dist + 1 < neighbour->dist) {
+                    neighbour->dist = current->dist + 1;
+                    neighbour->parent = current;
+                    neighbour->isVisited = true;
+                    pq.push(neighbour);
+                }
+            }
+        }
+    }
+}
 
+// --- 2. A* (A-STAR) ---
+void A_star(RenderWindow& window, Node map[ROW][COLUMN], Node *start, Node *finish) {
+    priority_queue<Node*, vector<Node*>, CompareForAStar> pq;
+    start->dist = 0; start->isVisited = true; start->fcost = start->dist + start->heur; pq.push(start);
+
+    while (!pq.empty()) {
+        Node* current = pq.top(); pq.pop();
+        if (current == finish) { backtrack(window, finish, map); return; }
+
+        renderFrame(window, map, start, finish);
+
+        sf::Event event; while (window.pollEvent(event)) if (event.type == sf::Event::Closed) { window.close(); return; }
+
+        for (int i = 0; i < 4; i++) {
+            int nx = current->x + dr[i]; int ny = current->y + dc[i];
+            if (nx >= 0 && nx < ROW && ny >= 0 && ny < COLUMN) {
+                Node* neighbour = &map[nx][ny];
                 if (!neighbour->isWall) {
-                    int newdist = current->dist+1;  //ağırlıksız olduğu için her adım 1 maliyet
-
-                    if (newdist<neighbour->dist) {
-                        neighbour->dist=newdist;
-                        neighbour->isVisited=true;
-                        neighbour->fcost=neighbour->dist+neighbour->heur;
-                        neighbour->parent=current;
+                    int newdist = current->dist + 1;
+                    if (newdist < neighbour->dist) {
+                        neighbour->dist = newdist;
+                        neighbour->isVisited = true;
+                        neighbour->fcost = neighbour->dist + neighbour->heur;
+                        neighbour->parent = current;
                         pq.push(neighbour);
                     }
                 }
@@ -165,105 +130,60 @@ void A_star(RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finis
         }
     }
 }
-void DFS(RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
-    stack<Node*> st;
-    start->isVisited=true;
-    start->dist=0;
-    st.push(start);
+
+// --- 3. DFS ---
+void DFS(RenderWindow& window, Node map[ROW][COLUMN], Node *start, Node *finish) {
+    stack<Node*> st; start->isVisited = true; start->dist = 0; st.push(start);
 
     while (!st.empty()) {
-    Node* current = st.top();
-        st.pop();
-        if (current==finish) {
-            backtrack(window,finish,map);
+        Node* current = st.top(); st.pop();
+        if (current == finish){
+            backtrack(window, finish, map);
             return;
         }
-        window.clear(sf::Color::White);
-        drawDebugGrid(window, map); // Senin harita çizme fonksiyonun
-        window.display();
 
-        // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
-        sf::sleep(sf::milliseconds(10));
+        renderFrame(window, map, start, finish);
 
-        // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-                return;
-            }
-        }
+        sf::Event event; while (window.pollEvent(event)) if (event.type == sf::Event::Closed) { window.close(); return; }
 
-        for (int i=0;i<4;i++) {
-            int nx= current->x+dr[i];
-            int ny= current->y+dc[i];
-
-            if (nx>=0 && nx<ROW && ny>=0 && ny<COLUMN) {
+        for (int i = 0; i < 4; i++) {
+            int nx = current->x + dr[i]; int ny = current->y + dc[i];
+            if (nx >= 0 && nx < ROW && ny >= 0 && ny < COLUMN) {
                 Node* neighbour = &map[nx][ny];
-                if (!neighbour->isWall && !neighbour->isVisited) { // DFS olduğu için ziyaret edilmemesi ve duvar olmaması yeterli
-
-                    neighbour->isVisited=true;
-                    neighbour->parent=current;
-                    neighbour->dist=current->dist+1;
-
+                if (!neighbour->isWall && !neighbour->isVisited) {
+                    neighbour->isVisited = true;
+                    neighbour->parent = current;
+                    neighbour->dist = current->dist + 1;
                     st.push(neighbour);
                 }
             }
-
         }
-
     }
-
 }
-void BFS(RenderWindow& window,Node map[ROW][COLUMN], Node *start, Node *finish) {
-    queue<Node*> que;
-    start->isVisited = true;
-    start->dist = 0;
-    que.push(start);
+
+// --- 4. BFS ---
+void BFS(RenderWindow& window, Node map[ROW][COLUMN], Node *start, Node *finish) {
+    queue<Node*> que; start->isVisited = true; start->dist = 0; que.push(start);
 
     while (!que.empty()) {
-        Node* current = que.front();
-        que.pop();
+        Node* current = que.front(); que.pop();
+        if (current == finish) { backtrack(window, finish, map); return; }
 
-        if (current==finish) {
-            backtrack(window,finish,map);
-            return;
-        }
-        window.clear(sf::Color::White);
-        drawDebugGrid(window, map); // Senin harita çizme fonksiyonun
-        window.display();
+        renderFrame(window, map, start, finish);
 
-        // 3. İnsan gözünün görebilmesi için biraz bekle (Örn: 50ms)
-        sf::sleep(sf::milliseconds(10));
+        sf::Event event; while (window.pollEvent(event)) if (event.type == sf::Event::Closed) { window.close(); return; }
 
-        // 4. Pencere kilitlenmesin diye event'leri kontrol et (Opsiyonel ama iyi olur)
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed) {
-                window.close();
-                return;
-            }
-        }
-        for (int i=0;i<4;i++) {
-            int nx=current->x+dr[i];
-            int ny=current->y+dc[i];
-
-            if (nx>=0 && nx<ROW && ny>=0 && ny<COLUMN) {
-                Node* neighbour= &map[nx][ny];
-
-                if (!neighbour->isWall && !neighbour->isVisited) { // BFS olduğu için duvar değilse ve ziyaret edilmemişse git
-                    neighbour->isVisited=true;
-                    neighbour->parent=current;
-                    neighbour->dist=current->dist+1;
-
+        for (int i = 0; i < 4; i++) {
+            int nx = current->x + dr[i]; int ny = current->y + dc[i];
+            if (nx >= 0 && nx < ROW && ny >= 0 && ny < COLUMN) {
+                Node* neighbour = &map[nx][ny];
+                if (!neighbour->isWall && !neighbour->isVisited) {
+                    neighbour->isVisited = true;
+                    neighbour->parent = current;
+                    neighbour->dist = current->dist + 1;
                     que.push(neighbour);
                 }
             }
         }
     }
 }
-
-
-
-
-

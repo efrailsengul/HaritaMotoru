@@ -6,8 +6,154 @@
 #include <algorithm>
 #include<climits>
 #include <random>
-
+#include <vector>
+#include <numeric>
+#include <random>
+#include <algorithm>
+#include <cmath>
 using namespace std;
+
+void runBulldozer(Node map[ROW][COLUMN], Node* start, Node* finish) {
+    int cx = start->x;
+    int cy = start->y;
+
+    int targetX = finish->x;
+    int targetY = finish->y;
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Yönler: 0:Yukarı, 1:Aşağı, 2:Sol, 3:Sağ
+    std::uniform_int_distribution<> randDir(0, 3);
+    std::uniform_int_distribution<> randStep(3, 8); // İnatçılık: 3 ile 8 kare boyunca aynı yöne git
+    std::uniform_int_distribution<> randProb(0, 100);
+
+    // Hedefe varana kadar (veya çok yaklaşana kadar) döngü
+    // Sonsuz döngüye girmesin diye max adım sınırı koyalım (Örn: 1000 adım)
+    int safety = 0;
+    while ((cx != targetX || cy != targetY) && safety < 2000) {
+        safety++;
+
+        // --- KARAR ANI ---
+        int direction = -1;
+
+        // %15 İhtimalle Hedefe Yönel (Eskiden %70 ti, şimdi sarhoş ettik)
+        if (randProb(gen) < 15) {
+            if (cx < targetX) direction = 1;      // Aşağı
+            else if (cx > targetX) direction = 0; // Yukarı
+            else if (cy < targetY) direction = 3; // Sağ
+            else if (cy > targetY) direction = 2; // Sol
+        }
+        // %85 İhtimalle Rastgele Bir Yön Seç
+        else {
+            direction = randDir(gen);
+        }
+
+        // --- İNATÇILIK (Aynı yöne kaç adım gidecek?) ---
+        int steps = randStep(gen);
+
+        for(int k=0; k<steps; k++) {
+            // Hareket et
+            if (direction == 0 && cx > 1) cx--;
+            else if (direction == 1 && cx < ROW - 2) cx++;
+            else if (direction == 2 && cy > 1) cy--;
+            else if (direction == 3 && cy < COLUMN - 2) cy++;
+
+            // Kazı Yap (Biraz geniş kazsın, tek kare olmasın)
+            map[cx][cy].isWall = false;
+
+            // Hedefe ulaştıysak döngüyü kır
+            if(cx == targetX && cy == targetY) break;
+        }
+    }
+
+    finish->isWall = false;
+}
+void ensurePath(Node map[ROW][COLUMN]) {
+    // Başlangıç konumu
+    int x = 1;
+    int y = 1;
+
+    // Hedef konumu
+    int targetX = ROW - 2;
+    int targetY = COLUMN - 2;
+
+    // Hedefe varana kadar döngü
+    while (x != targetX || y != targetY) {
+        // Bulunduğumuz yeri duvar olmaktan çıkar (YOL YAP)
+        map[x][y].isWall = false;
+
+        // Rastgelelik ekle ki dümdüz çizgi gibi durmasın (Doğal dursun)
+        // %50 ihtimalle X ekseninde, %50 ihtimalle Y ekseninde ilerle
+        int direction = rand() % 2;
+
+        if (direction == 0) { // X Ekseninde Hareket
+            if (x < targetX) x++;
+            else if (x > targetX) x--;
+        }
+        else { // Y Ekseninde Hareket
+            if (y < targetY) y++;
+            else if (y > targetY) y--;
+        }
+
+        // --- Ekstra Doğallık (Opsiyonel) ---
+        // Bazen yolu kalınlaştır (Sağını solunu da aç)
+        if (rand() % 5 == 0) { // %20 ihtimalle etrafı da aç
+            if (x + 1 < ROW) map[x+1][y].isWall = false;
+            if (y + 1 < COLUMN) map[x][y+1].isWall = false;
+        }
+    }
+
+    // Son olarak hedef noktayı da aç
+    map[targetX][targetY].isWall = false;
+}
+
+// Basit Perlin Noise Sınıfı
+class PerlinNoise {
+    vector<int> p; // Rastgelelik permütasyon tablosu
+
+public:
+    // Kurucu Fonksiyon: Her seferinde farklı harita çıksın diye 'seed' alır
+    PerlinNoise(unsigned int seed) {
+        p.resize(256);
+        iota(p.begin(), p.end(), 0); // 0'dan 255'e sayıları diz
+        default_random_engine engine(seed);
+        shuffle(p.begin(), p.end(), engine); // Sayıları karıştır
+        p.insert(p.end(), p.begin(), p.end());    // Diziyi ikiye katla (taşmayı önlemek için)
+    }
+
+    // Koordinat ver, bana gürültü değerini (-1 ile 1 arası) dön
+    double noise(double x, double y, double z) {
+        int X = (int)floor(x) & 255;
+        int Y = (int)floor(y) & 255;
+        int Z = (int)floor(z) & 255;
+
+        x -= floor(x); y -= floor(y); z -= floor(z);
+
+        double u = fade(x), v = fade(y), w = fade(z);
+
+        // Gradyan hesaplamaları (Haşmetli matematik kısmı)
+        int A = p[X] + Y, AA = p[A] + Z, AB = p[A + 1] + Z;
+        int B = p[X + 1] + Y, BA = p[B] + Z, BB = p[B + 1] + Z;
+
+        return lerp(w, lerp(v, lerp(u, grad(p[AA], x, y, z), grad(p[BA], x - 1, y, z)),
+                               lerp(u, grad(p[AB], x, y - 1, z), grad(p[BB], x - 1, y - 1, z))),
+                       lerp(v, lerp(u, grad(p[AA + 1], x, y, z - 1), grad(p[BA + 1], x - 1, y, z - 1)),
+                               lerp(u, grad(p[AB + 1], x, y - 1, z - 1), grad(p[BB + 1], x - 1, y - 1, z - 1))));
+    }
+
+private:
+    // Geçişleri yumuşatan fonksiyonlar
+    double fade(double t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+    double lerp(double t, double a, double b) { return a + t * (b - a); }
+    double grad(int hash, double x, double y, double z) {
+        int h = hash & 15;
+        double u = h < 8 ? x : y;
+        double v = h < 4 ? y : h == 12 || h == 14 ? x : z;
+        return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+    }
+};
+
 
 struct DSU {
     vector<int> parent;
@@ -126,5 +272,65 @@ void generate_w_kruskal(Node map[ROW][COLUMN]) {
     map[ROW-1][COLUMN-2].isWall=false;
     map[ROW-2][COLUMN-1].isWall=false;
 
+}
+void generate_w_perlin(Node map[ROW][COLUMN]) {
+    random_device rd;
+    PerlinNoise pn(rd());
+    //ölçek ayarı mağaralar için büyüklük degeri gibi düsünülebilir
+    float scale = 0.20f;
+
+    //threshold fonksiyonun duvar yapıp yapmaması için gereken eşik değeri
+    float threshold = 0.35f;
+    for (int i=0;i<ROW;i++) {
+        for (int j=0;j<COLUMN;j++) {
+            if (map[i][j].isStart || map[i][j].isFinish) {
+                continue;
+            }
+            double n = pn.noise(i*scale,j*scale,0.0);
+
+            //değeri 0 ile 1 arasına çekmek için
+            n = (n + 1.0) / 2.0;
+
+            //eşik değerinden büyükse duvar değilse yol yapıyoruz
+            if (n > threshold-0.15 && n < threshold+0.15) {
+                map[i][j].isWall=true;
+            }
+            else {
+                map[i][j].isWall = false;
+            }
+
+
+        }
+
+    }
+    //giriş ve çıkışın etrafını sorun olmasın diye elle açıyoruz
+    map[0][1].isWall = false;
+    map[1][0].isWall = false;
+    map[1][1].isWall = false;
+    map[1][2].isWall = false;
+    map[2][1].isWall = false;
+
+    map[ROW-2][COLUMN-2].isWall = false;
+    map[ROW-3][COLUMN-2].isWall = false;
+    map[ROW-2][COLUMN-3].isWall = false;
+    map[ROW-1][COLUMN-2].isWall=false;
+    map[ROW-2][COLUMN-1].isWall=false;
+
+    // runBulldozer(map, &map[1][1], &map[ROW-2][COLUMN-2]);
+    // // // runBulldozer(map, &map[ROW-5][5], &map[ROW-2][COLUMN-2]);
+    // // // runBulldozer(map, &map[5][COLUMN-5], &map[ROW-2][COLUMN-2]);
+    ensurePath(map);
+    std::mt19937 g(rd());
+    std::uniform_int_distribution<> randR(5, ROW-5);    // Kenarlara çok yapışmasın
+    std::uniform_int_distribution<> randC(5, COLUMN-5);
+
+    // 3 tane rastgele buldozer salalım
+    // for(int i=0; i<1; i++) {
+    //     int rStart = randR(g);
+    //     int cStart = randC(g);
+    //
+    //     // Rastgele bir yerden başlasın, Finish'e gitmeye çalışsın
+    //     runBulldozer(map, &map[rStart][cStart], &map[ROW-2][COLUMN-2]);
+    // }
 }
 

@@ -1,87 +1,84 @@
 #include <SFML/Graphics.hpp>
 #include <imgui.h>
 #include <imgui-sfml.h>
-#include <iostream>
-
 #include "Algorithims.hpp"
 #include "Node.hpp"
 #include "MapGenerator.hpp"
 #include "Settings.hpp"
+#include "GUI.hpp"
+#include<iostream>
 using namespace sf;
-const float CELL_SIZE = 15.0f;
 
-// Renklendirme ve Çizim Fonksiyonu
-void drawDebugGrid(RenderWindow& window, Node map[ROW][COLUMN]) {
-    RectangleShape cell(Vector2f(CELL_SIZE - 1.0f, CELL_SIZE - 1.0f));
-
-    for (int i = 0; i < ROW; i++) {
-        for (int j = 0; j < COLUMN; j++) {
-            cell.setPosition(j * CELL_SIZE, i * CELL_SIZE);
-
-            if (map[i][j].isStart) {
-                cell.setFillColor(Color::Green);
-            }
-            else if (map[i][j].isFinish) {
-                cell.setFillColor(Color::Red);
-            }
-            else if (map[i][j].isWall) {
-                cell.setFillColor(Color::Black);
-            }
-            else if (map[i][j].isPath)
-                cell.setFillColor(Color::Magenta);
-            else if (map[i][j].isVisited) {
-                cell.setFillColor(Color(100, 100, 255));
-            }
-
-            else {
-                cell.setFillColor(Color(240, 240, 240));
-            }
-
-            window.draw(cell);
-        }
-    }
-}
+// --- GLOBAL DEĞİŞKEN TANIMI ---
+ImFont* globalFont = nullptr;
+const float DRAW_CELL_SIZE = 15.0f;
 int main() {
     Node map[ROW][COLUMN];
     initMap(map);
-    generate_w_kruskal(map);
-     // dijkstra(map,&map[0][0],&map[ROW-1][COLUMN-1]);
-    // A_star(map,&map[0][0],&map[ROW-1][COLUMN-1]);
-    RenderWindow window(VideoMode(COLUMN * CELL_SIZE, ROW * CELL_SIZE), "Algoritma Test Penceresi");
+    generate_w_perlin(map);
+
+    int mapWidth = COLUMN * DRAW_CELL_SIZE;
+    int mapHeight = ROW * DRAW_CELL_SIZE;
+    int panelHeight = 200;
+
+    RenderWindow window(VideoMode(mapWidth, mapHeight + panelHeight), "Algoritma Kontrol Merkezi", Style::Close);
     window.setFramerateLimit(60);
 
+    if (!ImGui::SFML::Init(window)) return -1;
+    Clock deltaClock;
+
+    // --- FONTU YÜKLE VE GLOBAL DEĞİŞKENE ATA ---
+    ImGuiIO& io = ImGui::GetIO();
+    globalFont = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\arialbi.ttf", 20.0f);
+
+    if (globalFont == nullptr) {
+        std::cout << "Font bulunamadi, varsayilan kullaniliyor." << std::endl;
+    }
+    (void)ImGui::SFML::UpdateFontTexture();
+    // -------------------------------------------
+
+    Node* startNode = &map[0][0];
+    Node* finishNode = &map[ROW-1][COLUMN-1];
+    int selectedAlgorithm = 0;
+
     while (window.isOpen()) {
-        Event event; // sf::Event -> Event
+        Event event;
         while (window.pollEvent(event)) {
-            if (event.type == Event::Closed) // sf::Event::Closed -> Event::Closed
-                window.close();
-            if (event.type == sf::Event::KeyPressed) {
-                // Hangi tuş? -> SPACE
-                if (event.key.code == sf::Keyboard::Space) {
-                    std::cout << "Space algilandi, algoritma basliyor..." << std::endl; // Konsoldan teyit et
+            ImGui::SFML::ProcessEvent(window, event);
+            if (event.type == Event::Closed) window.close();
 
-                    // Başlangıç ve bitiş noktalarını burada bulup gönder
-                    // Örnek: Start ve End node'larını bulup fonksiyona ver
-                    DFS(window, map, &map[0][0], &map[ROW-1][COLUMN-1]);
-                }
-            }
             if (Mouse::isButtonPressed(Mouse::Left)) {
-                Vector2i mousePos = Mouse::getPosition(window);
-                int j = mousePos.x / CELL_SIZE;
-                int i = mousePos.y / CELL_SIZE;
-
-                if (i >= 0 && i < ROW && j >= 0 && j < COLUMN) {
-                    if (!map[i][j].isStart && !map[i][j].isFinish) {
-                        map[i][j].isWall = true;
-                    }
+                if (!ImGui::GetIO().WantCaptureMouse) {
+                    Vector2i mousePos = Mouse::getPosition(window);
+                    int j = mousePos.x / DRAW_CELL_SIZE;
+                    int i = mousePos.y / DRAW_CELL_SIZE;
+                    if (i >= 0 && i < ROW && j >= 0 && j < COLUMN)
+                        if (!map[i][j].isStart && !map[i][j].isFinish) map[i][j].isWall = true;
                 }
             }
         }
 
-        window.clear(Color::White); // Arkaplan beyaz
-        drawDebugGrid(window, map);
-        window.display();
-    }
+        ImGui::SFML::Update(window, deltaClock.restart());
 
+        window.clear(Color::White);
+        drawDebugGrid(window, map);
+
+        // PARAMETRE SİLİNDİ: Artık fontu veya algoritma fontunu parametre olarak vermiyoruz
+        drawUI(window, map, startNode, finishNode, selectedAlgorithm, false);
+
+        ImGui::SFML::Render(window);
+        window.display();
+
+        if (selectedAlgorithm != 0) {
+            switch(selectedAlgorithm) {
+                case 1: std::cout << "Baslatiliyor: Dijkstra\n"; dijkstra(window, map, startNode, finishNode); break;
+                case 2: std::cout << "Baslatiliyor: A*\n"; A_star(window, map, startNode, finishNode); break;
+                case 3: std::cout << "Baslatiliyor: DFS\n"; DFS(window, map, startNode, finishNode); break;
+                case 4: std::cout << "Baslatiliyor: BFS\n"; BFS(window, map, startNode, finishNode); break;
+            }
+            selectedAlgorithm = 0;
+        }
+    }
+    ImGui::SFML::Shutdown();
     return 0;
 }

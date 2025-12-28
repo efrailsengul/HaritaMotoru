@@ -7,4 +7,5 @@
 void initMap(Node map[ROW][COLUMN]);
 void printMap(Node map[ROW][COLUMN]);
 void generate_w_kruskal(Node map[ROW][COLUMN]);
+void generate_w_perlin(Node map[ROW][COLUMN]);
 #endif
