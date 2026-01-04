@@ -12,10 +12,29 @@ using namespace sf;
 // --- GLOBAL DEĞİŞKEN TANIMI ---
 ImFont* globalFont = nullptr;
 const float DRAW_CELL_SIZE = 15.0f;
+//resimleri koyabilmek için texture nesnesi oluşturuyoruz
+ Texture tFloor,tVisited,tPath,tWall,tStart,tFinish;
+void loadTextures() {
+    //Çizdiğimiz resimleri yüklediğimiz yer
+    if (!tFloor.loadFromFile("path.png"))     printf("HATA: path.png bulunamadi!\n");
+    if (!tVisited.loadFromFile("visited_path.png")) printf("HATA: visited_path.png bulunamadi!\n");
+    if (!tPath.loadFromFile("route.png"))       printf("HATA: route.png bulunamadi!\n");
+    if (!tWall.loadFromFile("wall.png"))       printf("HATA: wall.png bulunamadi!\n");
+    if (!tStart.loadFromFile("start.png"))     printf("HATA: start.png bulunamadi!\n");
+    if (!tFinish.loadFromFile("finish.png"))   printf("HATA: finish.png bulunamadi!\n");
+    // resimlerin daha güzel gözükmesi için ayar
+    tFloor.setSmooth(false);
+    tVisited.setSmooth(false);
+    tPath.setSmooth(false);
+    tWall.setSmooth(false);
+    tStart.setSmooth(false);
+    tFinish.setSmooth(false);
+}
 int main() {
+
     Node map[ROW][COLUMN];
     initMap(map);
-    generate_w_perlin(map);
+    generate_w_kruskal(map);
 
     int mapWidth = COLUMN * DRAW_CELL_SIZE;
     int mapHeight = ROW * DRAW_CELL_SIZE;
@@ -40,22 +59,14 @@ int main() {
     Node* startNode = &map[0][0];
     Node* finishNode = &map[ROW-1][COLUMN-1];
     int selectedAlgorithm = 0;
-
+    //resimleri yüklüyoruz
+    loadTextures();
     while (window.isOpen()) {
         Event event;
         while (window.pollEvent(event)) {
             ImGui::SFML::ProcessEvent(window, event);
             if (event.type == Event::Closed) window.close();
 
-            if (Mouse::isButtonPressed(Mouse::Left)) {
-                if (!ImGui::GetIO().WantCaptureMouse) {
-                    Vector2i mousePos = Mouse::getPosition(window);
-                    int j = mousePos.x / DRAW_CELL_SIZE;
-                    int i = mousePos.y / DRAW_CELL_SIZE;
-                    if (i >= 0 && i < ROW && j >= 0 && j < COLUMN)
-                        if (!map[i][j].isStart && !map[i][j].isFinish) map[i][j].isWall = true;
-                }
-            }
         }
 
         ImGui::SFML::Update(window, deltaClock.restart());
@@ -63,7 +74,6 @@ int main() {
         window.clear(Color::White);
         drawDebugGrid(window, map);
 
-        // PARAMETRE SİLİNDİ: Artık fontu veya algoritma fontunu parametre olarak vermiyoruz
         drawUI(window, map, startNode, finishNode, selectedAlgorithm, false);
 
         ImGui::SFML::Render(window);

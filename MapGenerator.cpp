@@ -12,63 +12,6 @@
 #include <algorithm>
 #include <cmath>
 using namespace std;
-
-void runBulldozer(Node map[ROW][COLUMN], Node* start, Node* finish) {
-    int cx = start->x;
-    int cy = start->y;
-
-    int targetX = finish->x;
-    int targetY = finish->y;
-
-    std::random_device rd;
-    std::mt19937 gen(rd());
-
-    // Yönler: 0:Yukarı, 1:Aşağı, 2:Sol, 3:Sağ
-    std::uniform_int_distribution<> randDir(0, 3);
-    std::uniform_int_distribution<> randStep(3, 8); // İnatçılık: 3 ile 8 kare boyunca aynı yöne git
-    std::uniform_int_distribution<> randProb(0, 100);
-
-    // Hedefe varana kadar (veya çok yaklaşana kadar) döngü
-    // Sonsuz döngüye girmesin diye max adım sınırı koyalım (Örn: 1000 adım)
-    int safety = 0;
-    while ((cx != targetX || cy != targetY) && safety < 2000) {
-        safety++;
-
-        // --- KARAR ANI ---
-        int direction = -1;
-
-        // %15 İhtimalle Hedefe Yönel (Eskiden %70 ti, şimdi sarhoş ettik)
-        if (randProb(gen) < 15) {
-            if (cx < targetX) direction = 1;      // Aşağı
-            else if (cx > targetX) direction = 0; // Yukarı
-            else if (cy < targetY) direction = 3; // Sağ
-            else if (cy > targetY) direction = 2; // Sol
-        }
-        // %85 İhtimalle Rastgele Bir Yön Seç
-        else {
-            direction = randDir(gen);
-        }
-
-        // --- İNATÇILIK (Aynı yöne kaç adım gidecek?) ---
-        int steps = randStep(gen);
-
-        for(int k=0; k<steps; k++) {
-            // Hareket et
-            if (direction == 0 && cx > 1) cx--;
-            else if (direction == 1 && cx < ROW - 2) cx++;
-            else if (direction == 2 && cy > 1) cy--;
-            else if (direction == 3 && cy < COLUMN - 2) cy++;
-
-            // Kazı Yap (Biraz geniş kazsın, tek kare olmasın)
-            map[cx][cy].isWall = false;
-
-            // Hedefe ulaştıysak döngüyü kır
-            if(cx == targetX && cy == targetY) break;
-        }
-    }
-
-    finish->isWall = false;
-}
 void ensurePath(Node map[ROW][COLUMN]) {
     // Başlangıç konumu
     int x = 1;
@@ -201,32 +144,11 @@ void initMap(Node map[ROW][COLUMN]) {
         map[i][j].isPath=false;
         }
     }
-    //başlangıç ve bitişi sol üst ve sağ alt olarak seçtim. Değiştirmek isterseniz sölersiniz
+    //başlangıç ve bitişi sol üst ve sağ alt olarak seçtim.
     map[0][0].isStart=true;
     map[0][0].dist=0;
     map[0][0].fcost=map[0][0].heur;
     map[targetX-1][targetY-1].isFinish=true;
-}
-void printMap(Node map[ROW][COLUMN]) {
-    for (int i=0;i<ROW;i++) {
-        for (int j=0;j<COLUMN;j++) {
-            if (map[i][j].isStart) {
-                cout<< 'S';
-            }
-
-            else if (map[i][j].isFinish) {
-                cout<< 'F';
-            }
-            else if (map[i][j].isWall){
-                cout<<'#';
-            }
-            else {
-                cout<< '.';
-            }
-
-        }
-        cout<<"\n";
-    }
 }
 void generate_w_kruskal(Node map[ROW][COLUMN]) {
     for (int i=0;i<ROW;i++) {
@@ -291,7 +213,7 @@ void generate_w_perlin(Node map[ROW][COLUMN]) {
             //değeri 0 ile 1 arasına çekmek için
             n = (n + 1.0) / 2.0;
 
-            //eşik değerinden büyükse duvar değilse yol yapıyoruz
+            //eşik değeri istediğimiz aralıktaysa duvar yapıyoruz
             if (n > threshold-0.15 && n < threshold+0.15) {
                 map[i][j].isWall=true;
             }
@@ -316,21 +238,9 @@ void generate_w_perlin(Node map[ROW][COLUMN]) {
     map[ROW-1][COLUMN-2].isWall=false;
     map[ROW-2][COLUMN-1].isWall=false;
 
-    // runBulldozer(map, &map[1][1], &map[ROW-2][COLUMN-2]);
-    // // // runBulldozer(map, &map[ROW-5][5], &map[ROW-2][COLUMN-2]);
-    // // // runBulldozer(map, &map[5][COLUMN-5], &map[ROW-2][COLUMN-2]);
-    ensurePath(map);
-    std::mt19937 g(rd());
-    std::uniform_int_distribution<> randR(5, ROW-5);    // Kenarlara çok yapışmasın
-    std::uniform_int_distribution<> randC(5, COLUMN-5);
 
-    // 3 tane rastgele buldozer salalım
-    // for(int i=0; i<1; i++) {
-    //     int rStart = randR(g);
-    //     int cStart = randC(g);
-    //
-    //     // Rastgele bir yerden başlasın, Finish'e gitmeye çalışsın
-    //     runBulldozer(map, &map[rStart][cStart], &map[ROW-2][COLUMN-2]);
-    // }
+    ensurePath(map);
+
+
 }
 

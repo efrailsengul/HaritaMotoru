@@ -4,9 +4,16 @@
 #include "Node.hpp"
 #include "Settings.hpp"
 
+
 // --- GLOBAL FONT TANIMI ---
 // Bu satır sayesinde tüm dosyalar bu fonta erişebilecek.
 extern ImFont* globalFont;
+extern sf::Texture tFloor;
+extern sf::Texture tVisited;
+extern sf::Texture tPath;
+extern sf::Texture tWall;
+extern sf::Texture tStart;
+extern sf::Texture tFinish;
 
 // Harita Sıfırlama
 inline void resetMapForNewRun(Node map[ROW][COLUMN], Node* start) {
@@ -26,26 +33,63 @@ inline void resetMapForNewRun(Node map[ROW][COLUMN], Node* start) {
     }
 }
 
-// Harita Çizimi
+// Haritayı çizen ana fonksiyon
 inline void drawDebugGrid(sf::RenderWindow& window, Node map[ROW][COLUMN]) {
     const float DRAW_CELL_SIZE = 15.0f;
-    sf::RectangleShape cell(sf::Vector2f(DRAW_CELL_SIZE - 1.0f, DRAW_CELL_SIZE - 1.0f));
+    sf::Sprite sprite;
 
     for (int i = 0; i < ROW; i++) {
         for (int j = 0; j < COLUMN; j++) {
-            cell.setPosition(j * DRAW_CELL_SIZE, i * DRAW_CELL_SIZE);
-            if (map[i][j].isStart) cell.setFillColor(sf::Color::Green);
-            else if (map[i][j].isFinish) cell.setFillColor(sf::Color::Red);
-            else if (map[i][j].isWall) cell.setFillColor(sf::Color::Black);
-            else if (map[i][j].isPath) cell.setFillColor(sf::Color::Magenta);
-            else if (map[i][j].isVisited) cell.setFillColor(sf::Color(100, 100, 255));
-            else cell.setFillColor(sf::Color(240, 240, 240));
-            window.draw(cell);
+            float x = j * DRAW_CELL_SIZE;
+            float y = i * DRAW_CELL_SIZE;
+
+            // --- 2. HANGİ RESMİ SEÇECEĞİZ? (Önem Sırası) ---
+
+            // Önce Duvar (Çalı)
+            if (map[i][j].isWall) {
+                sprite.setTexture(tWall);
+            }
+            // Sonra Başlangıç (Kazma)
+            else if (map[i][j].isStart) {
+                sprite.setTexture(tStart);
+            }
+            // Sonra Bitiş (Sandık)
+            else if (map[i][j].isFinish) {
+                sprite.setTexture(tFinish);
+            }
+            // --- Zemin Durumları ---
+
+            // Yol (Altınlı Toprak) - En önemlisi bu!
+            else if (map[i][j].isPath) {
+                sprite.setTexture(tPath);
+            }
+            // Ziyaret Edilen (Kazılmış Toprak)
+            else if (map[i][j].isVisited) {
+                sprite.setTexture(tVisited);
+            }
+            // Hiçbiri değilse Normal Toprak
+            else {
+                sprite.setTexture(tFloor);
+            }
+
+            // --- 3. BOYUTLANDIRMA VE KONUM (Cilalama) ---
+
+            // Resmi hücrenin içine tam sığdırmak için Scale (Ölçek) hesabı
+            // Matematik: (Hedef Boyut) / (Resmin Gerçek Boyutu)
+            if (sprite.getTexture()) { // Güvenlik kontrolü
+                float scaleX = DRAW_CELL_SIZE / sprite.getTexture()->getSize().x;
+                float scaleY = DRAW_CELL_SIZE / sprite.getTexture()->getSize().y;
+                sprite.setScale(scaleX, scaleY);
+            }
+
+            sprite.setPosition(x, y);
+
+            // 4. Çiz
+            window.draw(sprite);
         }
     }
 }
 
-// ARTIK FONT PARAMETRESİ İSTEMİYORUZ (Otomatik globalFont kullanacak)
 inline void drawUI(sf::RenderWindow& window, Node map[ROW][COLUMN], Node* start, Node* finish, int& selectedAlgo, bool disableButtons = false) {
 
     float mapBottomY = ROW * 15.0f;
