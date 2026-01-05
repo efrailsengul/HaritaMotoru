@@ -8,6 +8,7 @@ typedef struct Node {
     int heur,dist,fcost;
     bool isVisited,isWall,isFinish,isStart,isPath;
 }Node;
+//A* için gerekli olan heuristic deger hesabı kare hesabı çalıştığımız için manhattan kullandık
 inline int calculateHeur(int x,int y,int targetX, int targetY ) {
     return abs(targetX-x)+abs(targetY-y);
 }

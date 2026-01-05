@@ -1,8 +1,7 @@
 #include "Algorithims.hpp"
-#include "GUI.hpp"      // Çizim fonksiyonu (drawUI) için
+#include "GUI.hpp"
 #include "Settings.hpp"
 #include "Node.hpp"
-
 #include <iostream>
 #include <vector>
 #include <stack>
@@ -18,10 +17,18 @@ using namespace std;
 // Komşuları daha hızlı gezebilmek için yön dizileri
 int dr[] = {-1, 1, 0, 0};
 int dc[] = {0, 0, -1, 1};
-
+//main de var gidip al demek için extern kullanıyoruz
+extern int visitedCount;
+extern long long duration;
+extern Font statusFont;
+//Ariel font kullanabilmek için gerekli değişken
+extern ImFont* globalFont;
+const float DRAW_CELL_SIZE = 15.0f;
 // Dijkstra öncelikli kuyruğu için karşılaştırma operatörü
+
 struct CompareDist {
     bool operator()(const Node* a, const Node* b) const {
+        //uzaklığı az olan öncelikli dediğimiz satır
         return a->dist > b->dist;
     }
 };
@@ -35,24 +42,53 @@ struct CompareForAStar {
 
 //Ekrana yazdırma fonksiyonu
 void renderFrame(RenderWindow& window, Node map[ROW][COLUMN], Node* start, Node* finish) {
-    static Clock renderClock;
-    Time dt = renderClock.restart();
 
-    // Delta time hatasını önlemek için güvenlik
-    if (dt.asSeconds() <= 0.0f) dt = seconds(0.001f);
+    //pencere donmasını önlemek için event kontrolü yapıyoruz
+    Event event;
+    while (window.pollEvent(event)) {
+        // Çarpıya basılırsa programı kapatıp kaçalım
+        if (event.type == Event::Closed) {
+            window.close();
+            exit(0); // Veya return; ama algoritmadan çıkmak zor olabilir
+        }
+    }
 
-    ImGui::SFML::Update(window, dt);
-
+    // ekranı temizliyoruz
     window.clear(Color::White);
+    // haritayı çiziyoruz
     drawDebugGrid(window, map);
 
-    int dummyAlgo = 0;
-    // GUI'yi çiz ama butonları kilitle (true)
-    // Font parametresini sildik çünkü GUI.hpp'de globalFont kullanıyoruz.
-    drawUI(window, map, start, finish, dummyAlgo, true);
+    float mapHeight = ROW * DRAW_CELL_SIZE;
+    float panelHeight = 200.0f;
 
-    ImGui::SFML::Render(window);
+    // çalışırkenki butonların kaybolduğu kısım için başka bir dikdörtgen çiziyoruz
+    RectangleShape panelCover(Vector2f(window.getSize().x, panelHeight));
+    panelCover.setPosition(0, mapHeight);
+    panelCover.setFillColor(Color(40, 40, 40));
+    panelCover.setOutlineThickness(2);
+    panelCover.setOutlineColor(Color::Black);
+
+    window.draw(panelCover);
+    Text infoText;
+    infoText.setFont(statusFont); // Main'den gelen font
+    infoText.setCharacterSize(24);
+    infoText.setFillColor(Color::Yellow); // Altın sarısı olsun
+
+    // ekrana yazdırmak için string oluşturuyoruz
+    std::string durum = "Hesaplamalar Suruyor...\nGezilen Kare: " + std::to_string(visitedCount);
+    infoText.setString(durum);
+
+    // Yazıyı panelin ortasına hizalıyoruz
+    FloatRect textRect = infoText.getLocalBounds();
+    infoText.setOrigin(textRect.left + textRect.width/2.0f, textRect.top  + textRect.height/2.0f);
+    infoText.setPosition(window.getSize().x / 2.0f, mapHeight + panelHeight / 2.0f);
+
+    window.draw(infoText);
+    // ekrana bastığımız kısım
     window.display();
+
+    // bekleme koyarak animasyon etkisi yaratıyoruz
+    sleep(milliseconds(10));
 }
 
 // Başlangıçtan bitişe yolu çizdiren fonksiyon
@@ -99,15 +135,17 @@ void dijkstra(RenderWindow& window, Node map[ROW][COLUMN], Node *start, Node *fi
         renderFrame(window, map, start, finish);
 
         Event event; while (window.pollEvent(event)) if (event.type == Event::Closed) { window.close(); return; }
-
+        //komşuları gezidiğimiz yer
         for (int i = 0; i < 4; i++) {
             int nx = current->x + dr[i]; int ny = current->y + dc[i];
             if (nx >= 0 && nx < ROW && ny >= 0 && ny < COLUMN) {
                 Node* neighbour = &map[nx][ny];
+                //dijkstra oluğu için daha kısa bir yol bulunduysa güncelleme yapılıyor
                 if (!neighbour->isWall && current->dist + 1 < neighbour->dist) {
                     neighbour->dist = current->dist + 1;
                     neighbour->parent = current;
                     neighbour->isVisited = true;
+                    visitedCount++;
                     pq.push(neighbour);
                 }
             }
@@ -144,8 +182,11 @@ void A_star(RenderWindow& window, Node map[ROW][COLUMN], Node *start, Node *fini
                 if (!neighbour->isWall) {
                     int newdist = current->dist + 1;
                     if (newdist < neighbour->dist) {
+                        neighbour->heur = calculateHeur(neighbour->x, neighbour->y, finish->x, finish->y);
                         neighbour->dist = newdist;
                         neighbour->isVisited = true;
+                        visitedCount++;
+                        // f costunu hesaplayıp push ediyoruz kuyruk öncelik sırasını f cost a göre yapıyor zaten push etmemiz yeterli
                         neighbour->fcost = neighbour->dist + neighbour->heur;
                         neighbour->parent = current;
                         pq.push(neighbour);
@@ -184,6 +225,7 @@ void DFS(RenderWindow& window, Node map[ROW][COLUMN], Node *start, Node *finish)
                 Node* neighbour = &map[nx][ny];
                 if (!neighbour->isWall && !neighbour->isVisited) {
                     neighbour->isVisited = true;
+                    visitedCount++;
                     neighbour->parent = current;
                     neighbour->dist = current->dist + 1;
                     st.push(neighbour);
@@ -216,6 +258,7 @@ void BFS(RenderWindow& window, Node map[ROW][COLUMN], Node *start, Node *finish)
                 Node* neighbour = &map[nx][ny];
                 if (!neighbour->isWall && !neighbour->isVisited) {
                     neighbour->isVisited = true;
+                    visitedCount++;
                     neighbour->parent = current;
                     neighbour->dist = current->dist + 1;
                     que.push(neighbour);

@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <cmath>
 using namespace std;
+
+// perlin noise algoritmasında bitişin etrafı kapanabiliyor bu durumun yaşanmaması için bir tane yol açıcı yolluyoruz
 void ensurePath(Node map[ROW][COLUMN]) {
     // Başlangıç konumu
     int x = 1;
@@ -26,7 +28,7 @@ void ensurePath(Node map[ROW][COLUMN]) {
         // Bulunduğumuz yeri duvar olmaktan çıkar (YOL YAP)
         map[x][y].isWall = false;
 
-        // Rastgelelik ekle ki dümdüz çizgi gibi durmasın (Doğal dursun)
+        // rasgelelik ekleyerek düz yol çizmesini engelliyoruz
         // %50 ihtimalle X ekseninde, %50 ihtimalle Y ekseninde ilerle
         int direction = rand() % 2;
 
@@ -39,7 +41,7 @@ void ensurePath(Node map[ROW][COLUMN]) {
             else if (y > targetY) y--;
         }
 
-        // --- Ekstra Doğallık (Opsiyonel) ---
+
         // Bazen yolu kalınlaştır (Sağını solunu da aç)
         if (rand() % 5 == 0) { // %20 ihtimalle etrafı da aç
             if (x + 1 < ROW) map[x+1][y].isWall = false;
@@ -97,7 +99,7 @@ private:
     }
 };
 
-
+//kruskal algoritması için DSU
 struct DSU {
     vector<int> parent;
 
@@ -130,6 +132,7 @@ struct Wall {
     int r1x,r1y;// duvarın solu ve üstü
     int r2x,r2y;// duvarın sağı ve altı
 };
+//haritayı başlatan fonksiyon
 void initMap(Node map[ROW][COLUMN]) {
     int targetX=51,targetY=51;
     for (int i=0;i<ROW;i++) {
@@ -138,19 +141,20 @@ void initMap(Node map[ROW][COLUMN]) {
         map[i][j].y=j;
         map[i][j].parent=nullptr;
         map[i][j].isFinish=map[i][j].isStart=map[i][j].isWall=map[i][j].isVisited=false;
-        map[i][j].heur= calculateHeur(i,j,targetX,targetY);
+        map[i][j].heur=0;
         map[i][j].dist=INT_MAX;
         map[i][j].fcost=INT_MAX;
         map[i][j].isPath=false;
         }
     }
-    //başlangıç ve bitişi sol üst ve sağ alt olarak seçtim.
+    //başlangıç ve bitişi sol üst ve sağ alt olarak seçtik.
     map[0][0].isStart=true;
     map[0][0].dist=0;
     map[0][0].fcost=map[0][0].heur;
     map[targetX-1][targetY-1].isFinish=true;
 }
 void generate_w_kruskal(Node map[ROW][COLUMN]) {
+    //her yeri önce duvar yapıyoruz
     for (int i=0;i<ROW;i++) {
         for (int j=0;j<COLUMN;j++) {
             map[i][j].isWall=true;
@@ -186,7 +190,7 @@ void generate_w_kruskal(Node map[ROW][COLUMN]) {
         }
     }
 
-    //giriş çıkış kapanmasın diye manuel açtım
+    //giriş çıkış kapanmasın diye manuel açtık
     map[0][0].isWall=false;
     map[0][1].isWall=false;
     map[1][0].isWall=false;
@@ -196,7 +200,9 @@ void generate_w_kruskal(Node map[ROW][COLUMN]) {
 
 }
 void generate_w_perlin(Node map[ROW][COLUMN]) {
+    //rasgelelik için nesne
     random_device rd;
+    // perlin noise matematik işlemleri için nesne
     PerlinNoise pn(rd());
     //ölçek ayarı mağaralar için büyüklük degeri gibi düsünülebilir
     float scale = 0.20f;

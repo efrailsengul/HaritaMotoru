@@ -5,7 +5,7 @@
 #include "Settings.hpp"
 
 
-// --- GLOBAL FONT TANIMI ---
+
 // Bu satır sayesinde tüm dosyalar bu fonta erişebilecek.
 extern ImFont* globalFont;
 extern sf::Texture tFloor;
@@ -14,8 +14,10 @@ extern sf::Texture tPath;
 extern sf::Texture tWall;
 extern sf::Texture tStart;
 extern sf::Texture tFinish;
+extern int visitedCount;
+extern long long duration;
 
-// Harita Sıfırlama
+// haritayı farklı bir algoritma için sıfırlayan fonksiyon
 inline void resetMapForNewRun(Node map[ROW][COLUMN], Node* start) {
     for (int i = 0; i < ROW; i++) {
         for (int j = 0; j < COLUMN; j++) {
@@ -43,39 +45,39 @@ inline void drawDebugGrid(sf::RenderWindow& window, Node map[ROW][COLUMN]) {
             float x = j * DRAW_CELL_SIZE;
             float y = i * DRAW_CELL_SIZE;
 
-            // --- 2. HANGİ RESMİ SEÇECEĞİZ? (Önem Sırası) ---
 
-            // Önce Duvar (Çalı)
+            //öncelik sırasına göre görselleri basıyoruz
+
+            // önce duvar resmini basıyoruz
             if (map[i][j].isWall) {
                 sprite.setTexture(tWall);
             }
-            // Sonra Başlangıç (Kazma)
+            // sonra başlangıç resmini
             else if (map[i][j].isStart) {
                 sprite.setTexture(tStart);
             }
-            // Sonra Bitiş (Sandık)
+            // sonra bitiş resmini
             else if (map[i][j].isFinish) {
                 sprite.setTexture(tFinish);
             }
-            // --- Zemin Durumları ---
+            // zemin için öncelik sıralaması
 
-            // Yol (Altınlı Toprak) - En önemlisi bu!
+            // en önemlisi çözüm yolu ilk yol
             else if (map[i][j].isPath) {
                 sprite.setTexture(tPath);
             }
-            // Ziyaret Edilen (Kazılmış Toprak)
+            // ziyaret edilen yol
             else if (map[i][j].isVisited) {
                 sprite.setTexture(tVisited);
             }
-            // Hiçbiri değilse Normal Toprak
+            // hiçbiri değilse normal yol
             else {
                 sprite.setTexture(tFloor);
             }
 
-            // --- 3. BOYUTLANDIRMA VE KONUM (Cilalama) ---
+            //resimleri boyutlandırıp konumlarını ayarladığımız yer
 
-            // Resmi hücrenin içine tam sığdırmak için Scale (Ölçek) hesabı
-            // Matematik: (Hedef Boyut) / (Resmin Gerçek Boyutu)
+            // resmi karemize sığdırmak için kare/görsel oranını kullanıyoruz
             if (sprite.getTexture()) { // Güvenlik kontrolü
                 float scaleX = DRAW_CELL_SIZE / sprite.getTexture()->getSize().x;
                 float scaleY = DRAW_CELL_SIZE / sprite.getTexture()->getSize().y;
@@ -84,14 +86,13 @@ inline void drawDebugGrid(sf::RenderWindow& window, Node map[ROW][COLUMN]) {
 
             sprite.setPosition(x, y);
 
-            // 4. Çiz
+            // en son çizdiriyoruz
             window.draw(sprite);
         }
     }
 }
-
+// arayüz çizen fonksiyon
 inline void drawUI(sf::RenderWindow& window, Node map[ROW][COLUMN], Node* start, Node* finish, int& selectedAlgo, bool disableButtons = false) {
-
     float mapBottomY = ROW * 15.0f;
     float windowWidth = (float)window.getSize().x;
     float panelHeight = 200.0f;
@@ -109,7 +110,6 @@ inline void drawUI(sf::RenderWindow& window, Node map[ROW][COLUMN], Node* start,
 
     ImGui::Begin("FullWidthPanel", nullptr, window_flags);
 
-    // --- FONTU AKTİF ET (Global değişkeni kullan) ---
     if (globalFont) ImGui::PushFont(globalFont);
 
     // Dikey Ortalama
@@ -122,7 +122,7 @@ inline void drawUI(sf::RenderWindow& window, Node map[ROW][COLUMN], Node* start,
     float spacing = style.ItemSpacing.x;
     float btnW = (contentW - (3 * spacing)) * 0.25f;
 
-    // 1. DIJKSTRA
+    // dijkstra butonu
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.6f, 0.37f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.7f, 0.45f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.1f, 0.5f, 0.3f, 1.0f));
@@ -133,7 +133,7 @@ inline void drawUI(sf::RenderWindow& window, Node map[ROW][COLUMN], Node* start,
 
     ImGui::SameLine();
 
-    // 2. A*
+    // A* butonu
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5f, 0.3f, 0.76f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.4f, 0.85f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.2f, 0.6f, 1.0f));
@@ -144,7 +144,7 @@ inline void drawUI(sf::RenderWindow& window, Node map[ROW][COLUMN], Node* start,
 
     ImGui::SameLine();
 
-    // 3. DFS
+    // dfs butonu
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.45f, 0.15f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.95f, 0.55f, 0.2f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.7f, 0.35f, 0.1f, 1.0f));
@@ -155,7 +155,7 @@ inline void drawUI(sf::RenderWindow& window, Node map[ROW][COLUMN], Node* start,
 
     ImGui::SameLine();
 
-    // 4. BFS
+    //bfs butonu
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.5f, 0.73f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.6f, 0.85f, 1.0f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.12f, 0.4f, 0.6f, 1.0f));
@@ -163,8 +163,32 @@ inline void drawUI(sf::RenderWindow& window, Node map[ROW][COLUMN], Node* start,
         if (start && finish) { resetMapForNewRun(map, start); selectedAlgo = 4; }
     }
     ImGui::PopStyleColor(3);
+    ImGui::Spacing();
+    ImGui::Separator();
 
-    // --- FONTU KAPAT ---
+    // Sadece bir test yapıldıysa göster
+    if (duration > 0 || visitedCount > 0) {
+
+        ImGui::Text("SONUC RAPORU:");
+        ImGui::Spacing();
+
+        // gezilen kare sayısını gösteriyoruz
+        ImGui::Text("Toplam Gezilen:");
+        ImGui::SameLine();
+        // sarı renk seçtik değiştirilebilir
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "%d Kare", visitedCount);
+
+        // geçen süreyi gösteriyoruz
+        ImGui::Text("Tamamlanma Suresi:");
+        ImGui::SameLine();
+        // yeşil renk seçtik
+        ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "%lld ms", duration);
+
+        ImGui::Spacing();
+        ImGui::TextDisabled("(Animasyon gecikmesi dahildir)");
+
+
+    }
     if (globalFont) ImGui::PopFont();
 
     ImGui::End();
